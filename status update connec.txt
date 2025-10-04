@@ -1,0 +1,104 @@
+if(processData.process_status == "UNDELIVERED_1" ||processData.process_status == "UNDELIVERED" ||
+        processData.process_status == "PICKUP_FAILED" ||processData.process_status == "PICKUP_FAILED_1" || processData.process_status == "DELIVERED" || processData.process_status == "ORD_PICKED" ||processData.process_status == "OUT_FOR_DELIVERY" ||processData.process_status == "OUT_FOR_PICKUP" || processData.process_status=="PARTIALLY_PICKED" || processData.process_status=="PARTIALLY_DELIVERED"){
+     var arr_check = [];
+var barcode = "";
+
+
+for(var i = 0 ; i < processData.loading_array.length; i++){
+  var loading = processData.loading_array[i];
+   barcode += loading.loading_sku_item_no;
+  if(i !== processData.loading_array.length -1){
+    barcode += ",";
+  }
+
+if(processData.process_status == "DELIVERED" || processData.process_status == "ORD_PICKED"){
+  if(loading.loading_sku_reason){
+  status = "";
+  }
+else{
+  status = "COMPLETED";
+}
+}
+else if(processData.process_status == "UNDELIVERED_1" ||processData.process_status == "UNDELIVERED" ||
+        processData.process_status == "PICKUP_FAILED" ||processData.process_status == "PICKUP_FAILED_1"){
+        //   if(loading.loading_exception){
+
+          if(loading.loading_sku_reason ==  "Breakage with Driver"){
+           status = "170-Breakage";
+          }
+          else if(loading.loading_sku_reason == "Customer refused"){
+             status="130-CM Refused";
+          }
+             else if(loading.loading_sku_reason =="Collection futile"){
+             status="136-Collection futile";
+        }
+else
+       {
+        status = processData.code_id;
+       }
+        //   }
+       
+}
+else if (processData.process_status == "OUT_FOR_DELIVERY" ||processData.process_status == "OUT_FOR_PICKUP"){
+  status = "";
+  
+}
+   else if(processData.process_status=="PARTIALLY_DELIVERED"){
+
+    //   if (loading.loading_sku_item_status == "Failed") {
+    //         status = loading.loading_exception;
+            
+        if( loading.loading_sku_reason=="Breakage with Driver"){
+           status ="170-Breakage";
+        }
+        else if( loading.loading_sku_reason=="180-Items left at Depot"){
+           status ="Warehouse Breakage";
+        }
+        else if( loading.loading_sku_reason=="Customer refused"){
+            status ="130-CM Refused";
+        }
+            
+        // }
+        // else if (loading.loading_sku_item_status == "Delivered") {
+        //     status = "COMPLETED";
+        // } 
+        else{
+            status="COMPLETED";
+        }
+   }
+else if(processData.process_status=="PARTIALLY_PICKED"){
+        // if (loading.loading_sku_item_status == "Failed") {
+        //     status = loading.loading_exception;
+            
+        if(loading.loading_sku_reason == "Breakage with Driver"){
+            status="170-Breakage";
+        }
+        else if(loading.loading_sku_reason == "Collection futile"){
+            status="136-Collection futile";
+        }
+        
+            
+            
+        // }
+        // else if (loading.loading_sku_item_status == "Pickup Successfull") {
+        //     status = "COMPLETED";
+        // } 
+        else{
+            status="COMPLETED";
+        }
+    }
+    
+ if (!status) {
+        status = "";
+    }
+
+    var obj = {
+        itemId: loading.loading_sku_item_no,
+        status: status
+    };
+
+    arr_check.push(obj);
+
+
+}
+ }
