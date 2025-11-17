@@ -35,26 +35,30 @@ const BorrowBookScreen = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    fetchUserId();
-  }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (userId) fetchAvailableBooks();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [userId]);
+useEffect(() => {
+  fetchUserId();
+}, []);
 
-  const fetchUserId = async () => {
-    const id = await AsyncStorage.getItem("userId");
-    setUserId(id);
-    fetchAvailableBooks();
-  };
+useEffect(() => {
+  if (!userId) return;
+  const interval = setInterval(() => {
+    silentRefresh();
+  }, 1000);
+  return () => clearInterval(interval);
+}, [userId]);
 
- const fetchAvailableBooks = async () => {
+
+const fetchUserId = async () => {
+  const id = await AsyncStorage.getItem("userId");
+  setUserId(id);
+  fetchAvailableBooks(true); 
+};
+
+
+const fetchAvailableBooks = async (showLoader = false) => {
   try {
-    setLoading(true);
+    if (showLoader) setLoading(true);
     const allBooks = await BookService.getBooks();
 
     let available = allBooks.filter((b) => !b.deleted && b.quantity > 0);
@@ -75,7 +79,9 @@ const BorrowBookScreen = () => {
 
       available = available.map((b) => ({
         ...b,
-        status: borrowedBookIds.has(b.bookId) ? "ALREADY_BORROWED" : b.status,
+        status: borrowedBookIds.has(b.bookId)
+          ? "ALREADY_BORROWED"
+          : b.status,
       }));
     }
 
@@ -87,11 +93,41 @@ const BorrowBookScreen = () => {
     setCategories(uniqueCategories);
   } catch (err) {
     console.error("Error fetching books:", err);
-    setBooks([]);
   } finally {
-    setLoading(false);
+    if (showLoader) setLoading(false);
   }
 };
+
+// Silent background refresh (no UI reload)
+const silentRefresh = async () => {
+  try {
+    const allBooks = await BookService.getBooks();
+    const borrowedByUser = await BorrowService.getRecordsByUser(userId);
+
+    const borrowedBookIds = new Set(
+      borrowedByUser
+        .filter(
+          (r) =>
+            r.status === "PENDING_BORROW" ||
+            r.status === "BORROWED" ||
+            r.status === "PENDING_RETURN"
+        )
+        .map((r) => r.bookId)
+    );
+
+    setBooks((prevBooks) =>
+      prevBooks.map((b) => ({
+        ...b,
+        status: borrowedBookIds.has(b.bookId)
+          ? "ALREADY_BORROWED"
+          : b.status,
+      }))
+    );
+  } catch (err) {
+    console.error("Silent refresh error:", err);
+  }
+};
+
 
 const handleBorrow = async (bookId) => {
   try {
@@ -154,6 +190,8 @@ const handleBorrow = async (bookId) => {
 
   return (
     <View style={styles.container}>
+
+      
       <Text style={styles.header}>📚 Available Books</Text>
 
       <TextInput
@@ -309,4 +347,18 @@ const styles = StyleSheet.create({
   pageBtnDisabled: { backgroundColor: "#9ecad3" },
   pageBtnText: { color: "#fff", fontWeight: "700" },
   pageInfo: { fontWeight: "700", color: "#0e5a64" },
+  backBtn: {
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  alignSelf: "flex-start",
+  marginBottom: 10,
+  borderRadius: 8,
+  backgroundColor: "#e6f7ff",
+},
+backText: {
+  color: "#0b7285",
+  fontWeight: "700",
+  fontSize: 16,
+},
+
 });

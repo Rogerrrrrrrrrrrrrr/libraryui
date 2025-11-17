@@ -1,7 +1,6 @@
 import React from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { View, TextInput, StyleSheet, Platform } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import LinearGradient from "react-native-linear-gradient";
 
 const SearchFilterBar = ({
   searchValue,
@@ -28,9 +27,14 @@ const SearchFilterBar = ({
           selectedValue={categoryValue}
           onValueChange={onCategoryChange}
           style={styles.picker}
+          mode="dropdown" 
         >
           {categories.map((c) => (
-            <Picker.Item key={c} label={c} value={c} />
+            <Picker.Item
+              key={c}
+              label={c.length > 25 ? c.slice(0, 22) + "..." : c} 
+              value={c}
+            />
           ))}
         </Picker>
       </View>
@@ -61,27 +65,30 @@ const styles = StyleSheet.create({
   search: {
     height: 44,
     paddingHorizontal: 14,
-    fontSize: 15,
+    fontSize: 14,
     color: "#333",
   },
-  pickerWrap: {
-    width: 160,
-    borderRadius: 14,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#d9eef2",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  picker: {
-    width: "100%",
-    height: 44,
-    color: "#333",
-  },
+ pickerWrap: {
+  flex: 1,
+  borderRadius: 14,
+  backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: "#d9eef2",
+  shadowColor: "#000",
+  shadowOpacity: 0.06,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+  overflow: "visible", 
+  justifyContent: "center",
+},
+
+picker: {
+  width: "100%",
+  height: 50, 
+  color: "#333",
+}
+
 });
 
 export default SearchFilterBar;

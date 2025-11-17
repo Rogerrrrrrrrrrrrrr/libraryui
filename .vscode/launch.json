@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run on Emulator",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "android",
+      "target": "emulator",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Run on Physical Device (Wi-Fi)",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "android",
+      "target": "device",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Attach to Running App",
+      "type": "reactnative",
+      "request": "attach",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

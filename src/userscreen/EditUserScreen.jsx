@@ -13,6 +13,7 @@ import {
 import LinearGradient from "react-native-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import UserService from "../api/UserService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const EditUserScreen = ({ route, navigation }) => {
   const { userId } = route.params;
@@ -39,34 +40,129 @@ const EditUserScreen = ({ route, navigation }) => {
     fetchUser();
   }, [userId]);
 
- const handleSave = async () => {
-  if (!user.name || !user.email) {
-    Alert.alert("Validation Error", "Name and Email are required!");
-    return;
-  }
+  const handleSave = async () => {
+    if (!user.name || !user.email) {
+      Alert.alert("Validation Error", "Name and Email are required!");
+      return;
+    }
 
-  try {
-    const payload = {
-      name: user.name,
-      email: user.email,
-      password: user.password || undefined,
-      role: originalRole, 
-    };
+    try {
+      const payload = {
+        name: user.name,
+        email: user.email,
+        password: user.password || undefined,
+        role: originalRole,
+      };
 
-    await UserService.updateUser(userId, payload);
+      await UserService.updateUser(userId, payload);
 
-    Alert.alert("Success", "User updated successfully", [
-      {
-        text: "OK",
-        onPress: () => navigation.replace("Users", { refresh: true }), 
-      },
-    ]);
-  } catch (err) {
-    console.error(err);
-    Alert.alert("Error", "Failed to update user");
-  }
-};
+      const storedRole = await AsyncStorage.getItem("role");
+      const storedEmail = await AsyncStorage.getItem("email");
+      const lowerRole = storedRole?.toLowerCase();
 
+      // Check if user updated their own email
+      const isOwnAccount = user.email !== storedEmail;
+
+      if (isOwnAccount) {
+        await AsyncStorage.clear();
+        Alert.alert(
+          "Re-login Required",
+          "Your email has been updated. Please log in again with your new credentials.",
+          [
+            {
+              text: "OK",
+              onPress: () =>
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                }),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert("Success", "User updated successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            if (lowerRole === "admin") {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Users", params: { refresh: true } }],
+              });
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "UserDashboard", params: { refresh: true } }],
+              });
+            }
+          },
+        },
+      ]);
+    } catch (err) {
+      console.error("Update failed:", err);
+
+      if (err.message?.includes("exists")) {
+        Alert.alert(
+          "Error",
+          "This email is already registered. Please use a different one."
+        );
+      } else {
+        Alert.alert("Error", err.message || "Failed to update user.");
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    const storedRole = await AsyncStorage.getItem("role");
+    const storedEmail = await AsyncStorage.getItem("email");
+
+    if (storedRole?.toLowerCase() === "admin" && storedEmail === user.email) {
+      Alert.alert("Operation Blocked", "Admins cannot delete their own account.");
+      return;
+    }
+
+    try {
+      // Live check for active borrow records
+      const activeBorrow = await UserService.hasActiveBorrowRecords(userId);
+      if (activeBorrow) {
+        Alert.alert(
+          "Cannot Delete User",
+          "This user has active borrow records. Resolve them before deletion."
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Confirm Delete",
+        `Are you sure you want to delete ${user.name}?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await UserService.deleteUser(userId);
+                Alert.alert("Success", "User deleted successfully!");
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Users", params: { refresh: true } }],
+                });
+              } catch (err) {
+                console.error("Delete failed:", err);
+                Alert.alert("Error", "Failed to delete user.");
+              }
+            },
+          },
+        ]
+      );
+    } catch (err) {
+      //console.error("Check active borrows failed:", err);
+      Alert.alert("Error", "You have active borrow records.Cannot Delete account");
+    }
+  };
 
   if (loading || !user) {
     return (
@@ -137,6 +233,24 @@ const EditUserScreen = ({ route, navigation }) => {
             >
               <Icon name="save-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
               <Text style={styles.btnText}>Save Changes</Text>
+            </LinearGradient>
+          </Pressable>
+
+          <Pressable
+            onPress={handleDelete}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+            ]}
+          >
+            <LinearGradient
+              colors={["#ff7675", "#d63031"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.btnGradient}
+            >
+              <Icon name="trash-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.btnText}>Delete User</Text>
             </LinearGradient>
           </Pressable>
         </ScrollView>

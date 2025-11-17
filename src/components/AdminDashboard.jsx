@@ -63,19 +63,24 @@
 
 
 
-import React from "react";
+import React, { useLayoutEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { removeToken } from "../utils/storage";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Colors } from "../styles/theme";
+import MaskedView from "@react-native-masked-view/masked-view";
 
 const AdminDashboard = ({ navigation }) => {
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
   const menuItems = [
     { title: "Manage Books", screen: "Books", icon: "book-outline", colors: ["#43cea2", "#185a9d"] },
     { title: "Manage Users", screen: "Users", icon: "people-outline", colors: ["#ff6a00", "#ee0979"] },
-    { title: "Pending Requests", screen: "PendingRequestsScreen", icon: "time-outline", colors: ["#ff9966", "#ff5e62"] },
-    { title: "Borrowed History", screen: "BorrowHistory", icon: "time-outline", colors: ["#36d1dc", "#5b86e5"] },
+    { title: "Pending Requests", screen: "PendingRequestsScreen", icon: "time-outline", colors: ["#f7971e", "#ffd200"] },
+    { title: "Borrowed History", screen: "BorrowHistory", icon: "time-outline", colors: ["#ff512f", "#dd2476"] },
   ];
 
   const handleLogout = async () => {
@@ -86,35 +91,44 @@ const AdminDashboard = ({ navigation }) => {
   return (
     <LinearGradient
       colors={[Colors.secondary, Colors.secondaryDark]}
-      style={{ flex: 1, padding: 20, justifyContent: "center" }}
+      style={styles.container}
     >
-      <Text style={styles.header}>📚 Admin Dashboard</Text>
+      <MaskedView
+  maskElement={
+    <Text style={styles.title}>📚 Admin Dashboard</Text>
+  }
+>
+  <LinearGradient
+    colors={["#dee7e7ff", "#4facfe"]} 
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+  >
+    <Text style={[styles.title, { opacity: 0 }]}>📚 Admin Dashboard</Text>
+  </LinearGradient>
+</MaskedView>
 
-      <View style={{ alignItems: "center" }}>
+
+      <View style={styles.menuContainer}>
         {menuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
             style={styles.cardWrapper}
-            onPress={() => {
-              if (item.screen === "BorrowHistory") {
-                navigation.navigate(item.screen, { role: "admin" });
-              } else {
-                navigation.navigate(item.screen);
-              }
-            }}
-            activeOpacity={0.9}
+            onPress={() =>
+              navigation.navigate(item.screen, item.screen === "BorrowHistory" ? { role: "admin" } : undefined)
+            }
+            activeOpacity={0.85}
           >
             <LinearGradient colors={item.colors} style={styles.menuCard}>
-              <Icon name={item.icon} size={28} color="#fff" style={styles.icon} />
-              <Text style={styles.menuText}>{item.title}</Text>
+              <Icon name={item.icon} size={24} color="#fff" style={styles.icon} />
+              <Text style={styles.cardText}>{item.title}</Text>
             </LinearGradient>
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity style={styles.cardWrapper} onPress={handleLogout} activeOpacity={0.9}>
-          <LinearGradient colors={["#f12711", "#f5af19"]} style={styles.menuCard}>
-            <Icon name="log-out-outline" size={28} color="#fff" style={styles.icon} />
-            <Text style={styles.menuText}>Logout</Text>
+        <TouchableOpacity style={styles.cardWrapper} onPress={handleLogout} activeOpacity={0.85}>
+          <LinearGradient colors={["#c31432", "#240b36"]} style={styles.menuCard}>
+            <Icon name="log-out-outline" size={24} color="#fff" style={styles.icon} />
+            <Text style={styles.cardText}>Logout</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -123,36 +137,47 @@ const AdminDashboard = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  header: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
+  container: { flex: 1, padding: 20, justifyContent: "center" },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
     textAlign: "center",
-    marginBottom: 30,
-    letterSpacing: 1,
+    marginBottom: 40,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
   },
+  menuContainer: { alignItems: "center" },
   cardWrapper: {
-    width: "92%",
+    width: "90%",
     marginBottom: 18,
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: "hidden",
     elevation: 6,
     shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
   menuCard: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-start",
     paddingVertical: 18,
     paddingHorizontal: 22,
-    borderRadius: 18,
+    borderRadius: 16,
   },
   icon: { marginRight: 14 },
-  menuText: { color: "#fff", fontSize: 19, fontWeight: "600" },
+  cardText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: 0.4,
+  },
 });
 
 export default AdminDashboard;
+
 
 

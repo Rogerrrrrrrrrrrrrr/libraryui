@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import BookService from "../api/BookService";
 import BorrowService from "../api/BorrowService";
@@ -18,14 +18,16 @@ import SearchFilterBar from "../components/SearchFilterBar";
 import SortOptions from "../components/SortOptions";
 import Pagination from "../components/Pagination";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 const BookList = ({ navigation, route }) => {
-  const { role = "user", userId = null } = route?.params || {};
-
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ✅ Get role from AsyncStorage instead of route params
+  const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
@@ -36,6 +38,22 @@ const BookList = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // ✅ Load user role and ID from AsyncStorage on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const role = await AsyncStorage.getItem("role");
+        const id = await AsyncStorage.getItem("userId");
+        console.log("📋 Loaded from AsyncStorage:", { role, userId: id });
+        setUserRole(role?.toLowerCase());
+        setUserId(id);
+      } catch (error) {
+        console.error("❌ Failed to load user data:", error);
+      }
+    };
+    loadUserData();
+  }, []);
 
   const fetchBooks = async () => {
     try {
@@ -83,7 +101,7 @@ const BookList = ({ navigation, route }) => {
 
   const filtered = useMemo(() => {
     const visibleBooks =
-      role === "admin"
+      userRole === "admin"
         ? books
         : books.filter((b) => (b.quantity ?? 0) > 0);
 
@@ -115,7 +133,7 @@ const BookList = ({ navigation, route }) => {
     });
 
     return sorted;
-  }, [books, category, debouncedSearch, sortKey, sortDir, role]);
+  }, [books, category, debouncedSearch, sortKey, sortDir, userRole]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -138,25 +156,65 @@ const BookList = ({ navigation, route }) => {
     }
   };
 
-  const borrowBook = async (user, book) => {
+  const borrowBook = async (selectedUser, book) => {
+    console.log("🚀 borrowBook triggered with:", { 
+      selectedUser, 
+      book: book.title, 
+      userRole, 
+      userId 
+    });
+
     try {
-      await BorrowService.borrowBook(user.userId, book.bookId);
-      Alert.alert("✅ Success", `${book.title} borrowed by ${user.name}`);
+      // ✅ Admin validation
+      if (userRole === "admin" && !selectedUser) {
+        console.log("⚠️ Admin tried to borrow without selecting user");
+        Alert.alert("Error", "Please select a student first.");
+        return;
+      }
+
+      // ✅ Log action
+      if (userRole === "admin" && selectedUser) {
+        console.log("👑 Admin borrowing for student:", selectedUser.name);
+      } else {
+        console.log("👤 Regular user borrowing for themselves");
+      }
+
+      // ✅ Make API call
+      const response = userRole === "admin"
+        ? await BorrowService.borrowBook(book.bookId, selectedUser)
+        : await BorrowService.borrowBook(book.bookId);
+
+      console.log("✅ Borrow Response (Frontend):", response);
+
+      // ✅ Success message
+      Alert.alert(
+        "✅ Success",
+        userRole === "admin"
+          ? `${book.title} borrowed successfully for ${selectedUser.name}`
+          : `${book.title} borrowed successfully`
+      );
+      
       setModalVisible(false);
+      setSelectedBook(null);
       fetchBooks();
-    } catch (e) {
-      console.log("Borrow error:", e);
-      Alert.alert("Error", e.message || "Failed to borrow book");
+    } catch (error) {
+      console.error("💥 Borrow Error (Frontend):", error);
+      Alert.alert("Error", error.message || "Failed to borrow book");
     }
   };
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.header}>📚 Manage Books</Text>
+      <Text style={styles.header}></Text>
 
       <TouchableOpacity
         style={styles.scanButton}
-        onPress={() => navigation.navigate("ScanIsbn")}
+        onPress={() => {
+          Alert.alert(
+            "📱 Feature Under Development",
+            "The Scan ISBN feature is currently under development and will be available soon. Please check back in a future update."
+          );
+        }}
       >
         <Text style={styles.scanButtonText}>Scan ISBN</Text>
       </TouchableOpacity>
@@ -167,6 +225,11 @@ const BookList = ({ navigation, route }) => {
         categoryValue={category}
         onCategoryChange={setCategory}
         categories={categories}
+        style={{ 
+          searchWrapFlex: 2,
+          pickerWrapFlex: 1,
+          pickerMinWidth: 130
+        }}
       />
 
       <SortOptions
@@ -192,14 +255,22 @@ const BookList = ({ navigation, route }) => {
         renderItem={({ item }) => (
           <BookCard
             book={item}
-            isAdmin={role === "admin"}
+            isAdmin={userRole === "admin"}
             onBorrow={(book) => {
-              setSelectedBook(book);
-              setModalVisible(true);
+              console.log("📚 Borrow clicked for:", book.title, "Role:", userRole);
+
+              if (userRole === "admin") {
+                // ✅ Admin opens modal to select student
+                console.log("🔓 Opening modal for admin");
+                setSelectedBook(book);
+                setModalVisible(true);
+              } else {
+                // ✅ Student directly borrows
+                console.log("👤 Student borrowing directly");
+                borrowBook(null, book);
+              }
             }}
-            onEdit={(book) =>
-              navigation.navigate("EditBook", { bookId: book.bookId })
-            }
+            onEdit={(book) => navigation.navigate("EditBook", { bookId: book.bookId })}
             onDelete={(book) =>
               navigation.navigate("DeleteBook", {
                 bookId: book.bookId,
@@ -227,20 +298,30 @@ const BookList = ({ navigation, route }) => {
         onPageChange={setPage}
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate("AddBook")}
-      >
-        <Text style={styles.fabText}>＋</Text>
-      </TouchableOpacity>
-
-      {selectedBook && (
-        <UserSelectedModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onSelect={(user) => borrowBook(user, selectedBook)}
-        />
+      {userRole === "admin" && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate("AddBook")}
+        >
+          <Text style={styles.fabText}>＋</Text>
+        </TouchableOpacity>
       )}
+
+      {/* ✅ Modal for admin to select user */}
+      <UserSelectedModal
+        visible={modalVisible}
+        onClose={() => {
+          console.log("❌ Modal closed");
+          setModalVisible(false);
+          setSelectedBook(null);
+        }}
+        onSelect={(user) => {
+          console.log("✅ User selected from modal:", user);
+          if (selectedBook) {
+            borrowBook(user, selectedBook);
+          }
+        }}
+      />
     </View>
   );
 };

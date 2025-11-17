@@ -57,30 +57,35 @@ const AddBook = ({ navigation }) => {
           <TextInput
             placeholder="Title"
             value={title}
+            placeholderTextColor="#636e72"
             onChangeText={setTitle}
             style={styles.input}
           />
           <TextInput
             placeholder="Author"
             value={author}
+            placeholderTextColor="#636e72"
             onChangeText={setAuthor}
             style={styles.input}
           />
           <TextInput
             placeholder="ISBN"
             value={isbn}
+            placeholderTextColor="#636e72"
             onChangeText={setIsbn}
             style={styles.input}
           />
           <TextInput
             placeholder="Category"
             value={category}
+            placeholderTextColor="#636e72"
             onChangeText={setCategory}
             style={styles.input}
           />
           <TextInput
             placeholder="Quantity"
             value={quantity}
+            placeholderTextColor="#636e72"
             onChangeText={setQuantity}
             keyboardType="numeric"
             style={styles.input}
@@ -124,6 +129,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 15,
     backgroundColor: "#f1f2f6",
+    color: "#000",
   },
   btn: { marginTop: 10, borderRadius: 10, overflow: "hidden" },
   btnGradient: {

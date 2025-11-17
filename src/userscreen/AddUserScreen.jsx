@@ -33,7 +33,7 @@ const AddUserScreen = ({ navigation }) => {
       Alert.alert("Success", "Student added successfully!");
       navigation.replace("Users", { refresh: true });
     } catch (error) {
-      console.error("Error adding user:", error.message);
+      //console.error("Error adding user:", error.message);
       Alert.alert("Error", error.message || "Something went wrong.");
     }
   };

@@ -42,9 +42,10 @@ const DeleteBookScreen = ({ navigation, route }) => {
                 navigation.goBack();
               } catch (e) {
                 console.error("Delete error:", e);
-                Alert.alert("Error", "Failed to delete the book.");
+                Alert.alert("Error", e.message || "Failed to delete the book.");
                 navigation.goBack();
               }
+              
             },
           },
         ]

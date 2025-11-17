@@ -2,28 +2,41 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { removeToken, getUserData } from "../utils/storage";
+import { useFocusEffect, useRoute } from "@react-navigation/native";
 
 const UserDashboard = ({ navigation }) => {
   const [userData, setUserData] = React.useState(null);
+  const route = useRoute();
 
-  React.useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await getUserData(); 
-        console.log("📌 [UserDashboard] fetched userData from storage:", data);
+  // ✅ Fetch user data (used both on mount and refresh)
+  const fetchUser = async () => {
+    try {
+      const data = await getUserData();
+      setUserData({
+        role: data?.role?.toLowerCase() || "student",
+        userId: data?.userId || null,
+        name: data?.name || "",
+        email: data?.email || "",
+      });
+    } catch (err) {
+      console.error(err);
+      setUserData({ role: "student", userId: null });
+    }
+  };
 
-        const normalizedData = {
-          role: data?.role?.toLowerCase() || "student",
-          userId: data?.userId || null,
-        };
-
-        console.log("📌 [UserDashboard] normalized userData:", normalizedData);
-        setUserData(normalizedData);
-      } catch (err) {
-        console.error("⚠️ [UserDashboard] error fetching user data:", err);
-        setUserData({ role: "student", userId: null });
+  // ✅ Re-run fetchUser when coming back with refresh param
+  useFocusEffect(
+    React.useCallback(() => {
+      if (route.params?.refresh) {
+        fetchUser();
+        // reset the refresh flag to avoid infinite loops
+        navigation.setParams({ refresh: false });
       }
-    };
+    }, [route.params?.refresh])
+  );
+
+  // Initial fetch
+  React.useEffect(() => {
     fetchUser();
   }, []);
 
@@ -40,30 +53,22 @@ const UserDashboard = ({ navigation }) => {
   };
 
   const handleNavigate = (screen) => {
-    if (!userData) {
-      console.warn("⚠️ [UserDashboard] userData not loaded yet, cannot navigate");
-      return;
-    }
-    if (!userData.userId) {
-      console.warn("⚠️ [UserDashboard] userId not available yet, cannot navigate");
-      return;
-    }
-    console.log(`➡️ [UserDashboard] navigating to ${screen} with params:`, userData);
+    if (!userData || !userData.userId) return;
     navigation.navigate(screen, { role: userData.role, userId: userData.userId });
   };
 
   if (!userData || !userData.userId) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#0b7285" />
-        <Text style={{ marginTop: 10, color: "#555" }}>Loading user...</Text>
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={styles.loaderText}>Loading user...</Text>
       </View>
     );
   }
 
   return (
-    <LinearGradient colors={["#f6d365", "#fda085"]} style={styles.container}>
-      <Text style={styles.title}>👤 User Dashboard</Text>
+    <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+      <Text style={styles.title}>👤 {userData.name || "User"} Dashboard</Text>
 
       <View style={styles.menuContainer}>
         {menuItems.map((item, index) => (
@@ -73,14 +78,16 @@ const UserDashboard = ({ navigation }) => {
             onPress={() => handleNavigate(item.screen)}
             activeOpacity={0.85}
           >
-            <LinearGradient colors={["#a1c4fd", "#c2e9fb"]} style={styles.gradientBtn}>
+            <LinearGradient colors={["#89f7fe", "#66a6ff"]} style={styles.gradientBtn}>
               <Text style={styles.menuText}>{item.title}</Text>
             </LinearGradient>
           </TouchableOpacity>
         ))}
 
         <TouchableOpacity style={styles.logoutCard} onPress={handleLogout} activeOpacity={0.85}>
-          <Text style={styles.logoutText}>🚪 Logout</Text>
+          <LinearGradient colors={["#ff758c", "#ff7eb3"]} style={styles.gradientLogout}>
+            <Text style={styles.logoutText}>🚪 Logout</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -89,13 +96,34 @@ const UserDashboard = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 28, fontWeight: "bold", color: "#fff", marginBottom: 30 },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#667eea" },
+  loaderText: { marginTop: 10, color: "#fff", fontSize: 16 },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#fff",
+    marginBottom: 40,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+  },
   menuContainer: { width: "100%", alignItems: "center" },
-  menuCard: { width: "80%", marginVertical: 10, borderRadius: 14, overflow: "hidden", elevation: 5 },
-  gradientBtn: { paddingVertical: 16, alignItems: "center" },
-  menuText: { fontSize: 18, fontWeight: "700", color: "#0e5a64" },
-  logoutCard: { width: "80%", marginTop: 20, paddingVertical: 16, borderRadius: 14, backgroundColor: "#ff6b6b", alignItems: "center", elevation: 5 },
-  logoutText: { fontSize: 18, fontWeight: "700", color: "#fff" },
+  menuCard: {
+    width: "85%",
+    marginVertical: 12,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  gradientBtn: { paddingVertical: 18, alignItems: "center", borderRadius: 20 },
+  menuText: { fontSize: 20, fontWeight: "700", color: "#0b1f3f" },
+  logoutCard: { width: "85%", marginTop: 25, borderRadius: 20, overflow: "hidden", elevation: 5 },
+  gradientLogout: { paddingVertical: 18, alignItems: "center", borderRadius: 20 },
+  logoutText: { fontSize: 20, fontWeight: "700", color: "#fff" },
 });
 
 export default UserDashboard;

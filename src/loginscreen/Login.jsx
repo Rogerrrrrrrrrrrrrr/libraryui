@@ -31,46 +31,110 @@ const Login = ({ navigation }) => {
 
   const validateEmail = (email) => /^\S+@\S+\.\S+$/.test(email);
 
+  // const handleLogin = async () => {
+  //   let valid = true;
+  //   if (!email || !validateEmail(email)) {
+  //     setEmailError(true);
+  //     valid = false;
+  //   } else setEmailError(false);
+
+  //   if (!password) {
+  //     setPasswordError(true);
+  //     valid = false;
+  //   } else setPasswordError(false);
+
+  //   if (!valid) return;
+
+  //   setLoading(true);
+  //   try {
+  //     const data = await loginUser({ email, password });
+  //     if (data?.role) {
+  //       await AsyncStorage.setItem("role", data.role);
+  //       await AsyncStorage.setItem("userId", String(data.userId));
+  //       await storeToken(JSON.stringify(data));
+
+  //       if (data.role === "ADMIN") 
+  //         navigation.replace("AdminDashboard");
+  //       else 
+  //         navigation.replace("UserDashboard");
+
+  //     } 
+  //     else 
+  //       alert(data?.message || "Invalid credentials");
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Something went wrong.");
+  //   }
+  //   setLoading(false);
+  // };
+
+
   const handleLogin = async () => {
+    console.log("Login pressed with email:", email);
+  
     let valid = true;
-    if (!email || !validateEmail(email)) {
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       setEmailError(true);
       valid = false;
     } else setEmailError(false);
-
+  
     if (!password) {
       setPasswordError(true);
       valid = false;
     } else setPasswordError(false);
-
+  
     if (!valid) return;
-
+  
+    console.log("Validation passed, calling login API...");
     setLoading(true);
+  
     try {
       const data = await loginUser({ email, password });
-      if (data?.role) {
-        await AsyncStorage.setItem("role", data.role);
-        await AsyncStorage.setItem("userId", String(data.userId));
-        await storeToken(JSON.stringify(data));
-
-        if (data.role === "ADMIN") navigation.replace("AdminDashboard");
-else navigation.replace("UserDashboard");
-
-      } else alert(data?.message || "Invalid credentials");
+      console.log("Login API response:", data);
+  
+      // Check if token exists
+      if (!data?.token) {
+        console.log("Invalid login response:", data);
+        alert(data?.message || "Invalid credentials");
+        setLoading(false);
+        return;
+      }
+  
+      const role = data.role;// || (email === "abi@gmail.com" ? "ADMIN" : "USER");
+      //await AsyncStorage.setItem("userId", data.userId.toString());
+      await AsyncStorage.setItem("userToken", data.token);
+      await AsyncStorage.setItem("role", role.toLowerCase());
+      await AsyncStorage.setItem("email", data.email);
+      await AsyncStorage.setItem("userId", String(data.userId || 1)); // dummy userId if backend doesn't return it
+  
+      console.log("Stored token & role:", data.token, role);
+  
+      // Navigate based on role
+      if (role.toUpperCase() === "ADMIN") {
+        navigation.replace("AdminDashboard");
+      } else {
+        navigation.replace("UserDashboard");
+      }
+  
     } catch (err) {
       console.error(err);
       alert("Something went wrong.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
-
+  
+  
+  
+  
+  
   return (
     <LinearGradient colors={[Colors.secondary, Colors.secondaryDark]} style={{ flex: 1, justifyContent: "center", padding: 20 }}>
       <View style={cardStyles.card}>
         <Text style={cardStyles.title}>Welcome Back 👋</Text>
         <Text style={cardStyles.subtitle}>Login to continue</Text>
 
-        {/* Email */}
+        
         <View style={inputStyles.container}>
           <Icon name="mail-outline" size={20} color={Colors.primary} style={inputStyles.icon} />
           <TextInput

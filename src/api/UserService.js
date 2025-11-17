@@ -1,8 +1,12 @@
-const API_URL = "http://10.0.2.2:8080/api/users";
+import { BASE_URL } from './config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_URL = `${BASE_URL}/api/users`;
 
 async function handleResponse(response) {
   const rawText = await response.text();
   let data;
+
   try {
     data = rawText ? JSON.parse(rawText) : null;
   } catch {
@@ -20,14 +24,21 @@ async function handleResponse(response) {
   return data;
 }
 
+// Helper to get Authorization header
+async function authHeader() {
+  const token = await AsyncStorage.getItem('userToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const UserService = {
+
   getUsers: async () => {
     try {
       console.log("Fetching users from:", API_URL);
-      const response = await fetch(API_URL);
+      const headers = await authHeader();
+      const response = await fetch(API_URL, { headers });
       const data = await handleResponse(response);
-      if (Array.isArray(data)) return data;
-      return [];
+      return Array.isArray(data) ? data : [];
     } catch (err) {
       console.error("Error in getUsers:", err);
       throw err;
@@ -36,14 +47,19 @@ const UserService = {
 
   getUserById: async (id) => {
     if (!id) throw new Error("Invalid ID for getUserById");
-    const response = await fetch(`${API_URL}/${id}`);
+    const headers = await authHeader();
+    const response = await fetch(`${API_URL}/${id}`, { headers });
     return handleResponse(response);
   },
 
   addUser: async (user) => {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    };
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(user),
     });
     return handleResponse(response);
@@ -55,13 +71,18 @@ const UserService = {
     const payload = {
       name: user.name,
       email: user.email,
-      role: user.role, 
+      role: user.role,
+      ...(user.password ? { password: user.password } : {}),
     };
-    if (user.password) payload.password = user.password;
+
+    const headers = {
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    };
 
     const response = await fetch(`${API_URL}/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
 
@@ -70,7 +91,13 @@ const UserService = {
 
   deleteUser: async (id) => {
     if (!id) throw new Error("Invalid ID for deleteUser");
-    const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+
+    const headers = await authHeader();
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: "DELETE",
+      headers,
+    });
+
     return handleResponse(response);
   },
 };

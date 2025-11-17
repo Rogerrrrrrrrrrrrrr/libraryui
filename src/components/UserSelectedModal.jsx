@@ -8,17 +8,21 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
-import BorrowService from "../api/BorrowService";
+import UserService from "../api/UserService";
 
-const UserSelectModal = ({ visible, onClose, onSelect }) => {
+const UserSelectedModal = ({ visible, onClose, onSelect }) => {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (visible) fetchUsers();
-    else {
+    console.log("🔄 Modal visibility changed:", visible);
+    if (visible) {
+      fetchUsers();
+    } else {
+      // Reset state when modal closes
       setUsers([]);
       setSearch("");
     }
@@ -27,22 +31,48 @@ const UserSelectModal = ({ visible, onClose, onSelect }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await BorrowService.getAllUsers();
-      setUsers(Array.isArray(data) ? data : []);
+      console.log("📡 Fetching users...");
+      
+      const data = await UserService.getUsers();
+      console.log("✅ Raw users fetched:", data?.length || 0);
+
+      // Filter out admins
+      const filtered = Array.isArray(data)
+        ? data.filter((u) => u.role?.toLowerCase() !== "admin")
+        : [];
+
+      console.log("🧾 Filtered (non-admin) users:", filtered.length);
+      console.log("👥 Users:", filtered.map(u => ({
+        id: u.userId,
+        name: u.name,
+        email: u.email,
+        role: u.role
+      })));
+
+      setUsers(filtered);
     } catch (err) {
-      console.error("User fetch error:", err);
-      setUsers([]);
+      console.error("❌ User fetch error:", err);
+      Alert.alert("Error", err.message || "Failed to fetch users");
     } finally {
       setLoading(false);
     }
   };
 
   const filtered = users.filter((u) =>
-    (`${u.name || ""} ${u.email || ""}`).toLowerCase().includes(search.toLowerCase())
+    (`${u.name || ""} ${u.email || ""}`)
+      .toLowerCase()
+      .includes(search.toLowerCase().trim())
   );
 
+  console.log("🔍 Filtered by search:", filtered.length);
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      onRequestClose={onClose} 
+      transparent
+    >
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>Select User</Text>
@@ -60,23 +90,45 @@ const UserSelectModal = ({ visible, onClose, onSelect }) => {
           ) : (
             <FlatList
               data={filtered}
-              keyExtractor={(item) => (item.userId ?? item.id ?? Math.random()).toString()}
+              keyExtractor={(item) =>
+                item.userId?.toString() || Math.random().toString()
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.userItem}
-                  onPress={() => onSelect(item)}
+                  onPress={() => {
+                    console.log("👤 Selected User:", {
+                      userId: item.userId,
+                      name: item.name,
+                      email: item.email,
+                      role: item.role
+                    });
+                    onSelect(item);
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.userText}>{item.name}</Text>
-                  <Text style={styles.userEmail}>{item.email}</Text>
+                  <Text style={styles.userText}>{item.name || "Unknown"}</Text>
+                  <Text style={styles.userEmail}>{item.email || "No email"}</Text>
                   <Text style={styles.roleBadge}>{item.role || "N/A"}</Text>
                 </TouchableOpacity>
               )}
-              ListEmptyComponent={<Text style={styles.empty}>No users found</Text>}
+              ListEmptyComponent={
+                <Text style={styles.empty}>
+                  {loading ? "Loading..." : "No users found"}
+                </Text>
+              }
+              style={styles.list}
             />
           )}
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => {
+              console.log("❌ Close button pressed");
+              onClose();
+            }}
+            activeOpacity={0.8}
+          >
             <Text style={styles.closeText}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -85,12 +137,10 @@ const UserSelectModal = ({ visible, onClose, onSelect }) => {
   );
 };
 
-export default UserSelectModal;
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     paddingHorizontal: 16,
   },
@@ -105,7 +155,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 10,
   },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 12, color: "#0e5a64" },
+  title: { 
+    fontSize: 22, 
+    fontWeight: "700", 
+    marginBottom: 12, 
+    color: "#0e5a64",
+    textAlign: "center"
+  },
   search: {
     borderWidth: 1,
     borderColor: "#d9eef2",
@@ -113,6 +169,9 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     backgroundColor: "#f9f9f9",
+  },
+  list: {
+    maxHeight: 400,
   },
   userItem: {
     padding: 12,
@@ -125,8 +184,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  userText: { fontSize: 16, fontWeight: "600", color: "#094852" },
-  userEmail: { fontSize: 14, color: "#3a6871", marginTop: 2 },
+  userText: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    color: "#094852" 
+  },
+  userEmail: { 
+    fontSize: 14, 
+    color: "#3a6871", 
+    marginTop: 2 
+  },
   roleBadge: {
     marginTop: 4,
     alignSelf: "flex-start",
@@ -145,6 +212,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#0b7285",
     alignItems: "center",
   },
-  closeText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  empty: { textAlign: "center", marginTop: 20, color: "#666", fontSize: 16 },
+  closeText: { 
+    color: "#fff", 
+    fontWeight: "700", 
+    fontSize: 16 
+  },
+  empty: { 
+    textAlign: "center", 
+    marginTop: 20, 
+    color: "#666", 
+    fontSize: 16 
+  },
 });
+
+export default UserSelectedModal;

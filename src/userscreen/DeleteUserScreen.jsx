@@ -16,6 +16,7 @@ const DeleteUserScreen = ({ route, navigation }) => {
   const { userId } = route.params;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -23,7 +24,7 @@ const DeleteUserScreen = ({ route, navigation }) => {
         const userData = await UserService.getUserById(userId);
         setUser(userData);
       } catch (error) {
-        Alert.alert("Error", "Failed to load user details.");
+        Alert.alert("Error", error?.message || "Failed to load user details.");
       } finally {
         setLoading(false);
       }
@@ -31,21 +32,37 @@ const DeleteUserScreen = ({ route, navigation }) => {
     loadUser();
   }, [userId]);
 
- const handleDelete = async () => {
-  try {
-    await UserService.deleteUser(userId);
-    Alert.alert("✅ User Deleted", `User ${user?.name || ""} has been deleted.`, [
-      {
-        text: "OK",
-        onPress: () => navigation.replace("Users", { refresh: true }), 
-      },
-    ]);
-  } catch (error) {
-    console.error("Delete error:", error.message);
-    Alert.alert("Error", "Failed to delete user.");
-  }
-};
-
+  const handleDeactivate = async () => {
+    try {
+      await UserService.deleteUser(userId);
+      Alert.alert(
+        "✅ User Deactivated",
+        `User ${user?.name || ""} has been deactivated.`,
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.replace("Users", { refresh: true }),
+          },
+        ]
+      );
+    } catch (error) {
+      let message = "Failed to deactivate user.";
+  
+      // Check if backend returned the active borrow error
+      if (
+        error?.message?.includes("active borrow records") ||
+        error?.message?.includes("cannot be deleted")
+      ) {
+        message = "Cannot deactivate user: active borrow records exist.";
+      } else if (error?.message) {
+        message = error.message; // fallback to backend message if any
+      }
+  
+      Alert.alert("Error", message);
+    }
+  };
+  
+  
 
   if (loading) {
     return (
@@ -72,9 +89,16 @@ const DeleteUserScreen = ({ route, navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
-          <Icon name="alert-circle-outline" size={60} color="#d63031" style={{ marginBottom: 15 }} />
-          <Text style={styles.title}>Delete User</Text>
-          <Text style={styles.text}>Are you sure you want to delete this user?</Text>
+          <Icon
+            name="alert-circle-outline"
+            size={60}
+            color="#d63031"
+            style={{ marginBottom: 15 }}
+          />
+          <Text style={styles.title}>Deactivate User</Text>
+          <Text style={styles.text}>
+            Are you sure you want to deactivate this user?
+          </Text>
           <Text style={styles.userInfo}>
             {user.name} ({user.email}) - Role: {user.role}
           </Text>
@@ -93,16 +117,23 @@ const DeleteUserScreen = ({ route, navigation }) => {
                 end={{ x: 1, y: 1 }}
                 style={styles.btnGradient}
               >
-                <Icon name="close-outline" size={18} color="#fff" style={{ marginRight: 5 }} />
+                <Icon
+                  name="close-outline"
+                  size={18}
+                  color="#fff"
+                  style={{ marginRight: 5 }}
+                />
                 <Text style={styles.btnText}>Cancel</Text>
               </LinearGradient>
             </Pressable>
 
             <Pressable
-              onPress={handleDelete}
+              onPress={handleDeactivate}
+              disabled={deleting}
               style={({ pressed }) => [
                 styles.deleteBtn,
-                pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                pressed && !deleting && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                deleting && { opacity: 0.6 },
               ]}
             >
               <LinearGradient
@@ -111,8 +142,15 @@ const DeleteUserScreen = ({ route, navigation }) => {
                 end={{ x: 1, y: 1 }}
                 style={styles.btnGradient}
               >
-                <Icon name="trash-outline" size={18} color="#fff" style={{ marginRight: 5 }} />
-                <Text style={styles.btnText}>Delete</Text>
+                <Icon
+                  name="trash-outline"
+                  size={18}
+                  color="#fff"
+                  style={{ marginRight: 5 }}
+                />
+                <Text style={styles.btnText}>
+                  {deleting ? "Deactivating..." : "Deactivate"}
+                </Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -122,7 +160,7 @@ const DeleteUserScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: "center",
@@ -148,8 +186,14 @@ const styles = {
   buttonRow: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
   cancelBtn: { flex: 1, marginRight: 10, borderRadius: 30, overflow: "hidden" },
   deleteBtn: { flex: 1, marginLeft: 10, borderRadius: 30, overflow: "hidden" },
-  btnGradient: { flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 12, borderRadius: 30 },
+  btnGradient: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
   btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-};
+});
 
 export default DeleteUserScreen;

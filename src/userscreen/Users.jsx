@@ -25,34 +25,71 @@ const Users = ({ navigation, route }) => {
 
   const animationValues = useRef([]).current;
 
+  // ✅ Fetch role & userId and decide redirection or data load
   const fetchCurrentUser = async () => {
     try {
+      console.log("🔹 [fetchCurrentUser] Called");
+
       const role = route.params?.role || (await AsyncStorage.getItem("role"));
       const userId =
         route.params?.userId || (await AsyncStorage.getItem("userId"));
+
+      console.log("🔹 [fetchCurrentUser] Retrieved from params/storage →", {
+        role,
+        userId,
+      });
+
       setCurrentUserRole(role);
       setCurrentUserId(userId);
+
+      if (!role || !userId) {
+        console.log("⚠️ [fetchCurrentUser] Missing role or userId!");
+        return;
+      }
+
+      // ✅ Redirect student directly to their own profile
+      if (role?.toLowerCase() !== "admin") {
+        console.log(
+          `🟢 Non-admin detected → Fetching own profile for userId: ${userId}`
+        );
+
+        const currentUser = await UserService.getUserById(userId);
+
+        console.log("🟢 [fetchCurrentUser] API returned current user:", currentUser);
+
+        navigation.replace("EditUser", {
+          userId: getId(currentUser),
+          isSelf: true,
+          userData: currentUser,
+        });
+        return;
+      }
+
+      console.log("🟠 Admin detected → Fetching all users...");
       fetchUsers(role, userId);
     } catch (err) {
-      console.error(err);
+      console.error("❌ [fetchCurrentUser] Error:", err);
       setLoading(false);
     }
   };
 
+  // ✅ Fetch users (for admin)
   const fetchUsers = async (role, userId) => {
+    console.log("🔹 [fetchUsers] Called with:", { role, userId });
     setLoading(true);
     try {
       let data = await UserService.getUsers();
+      console.log("🔹 [fetchUsers] Raw data length:", data.length);
 
       if (role?.toLowerCase() === "admin") {
         data = data.filter(
           (u) =>
-            (u.role?.toLowerCase() === "student") ||
+            u.role?.toLowerCase() === "student" ||
             getId(u) === Number(userId)
         );
-      } else {
-        data = data.filter((u) => getId(u) === Number(userId));
       }
+
+      console.log("🔹 [fetchUsers] Filtered users count:", data.length);
 
       data.forEach((_, i) => {
         animationValues[i] = new Animated.Value(0);
@@ -69,8 +106,10 @@ const Users = ({ navigation, route }) => {
           })
         )
       ).start();
+
+      console.log("✅ [fetchUsers] Users set successfully");
     } catch (err) {
-      console.error(err);
+      console.error("❌ [fetchUsers] Error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,54 +117,71 @@ const Users = ({ navigation, route }) => {
   };
 
   useEffect(() => {
+    console.log("🚀 [useEffect] Users screen mounted. route.params =", route.params);
     fetchCurrentUser();
   }, [route.params]);
 
   const onRefresh = () => {
+    console.log("🔄 [onRefresh] Refreshing user list...");
     setRefreshing(true);
     fetchUsers(currentUserRole, currentUserId);
   };
 
   useEffect(() => {
     if (route.params?.refresh) {
+      console.log("🔁 [useEffect refresh] Triggered reload after edit.");
       fetchUsers(currentUserRole, currentUserId);
       navigation.setParams({ refresh: false });
     }
   }, [route.params]);
 
-  const filteredUsers = users.filter((u) => {
-    if (!searchText.trim()) return true;
-    const s = searchText.toLowerCase();
-    return (
-      (u.name && u.name.toLowerCase().includes(s)) ||
-      (u.email && u.email.toLowerCase().includes(s))
-    );
-  });
+  // ✅ Log filtered users count
+  const filteredUsers =
+    currentUserRole?.toLowerCase() === "admin"
+      ? users.filter((u) => {
+          if (!searchText.trim()) return true;
+          const s = searchText.toLowerCase();
+          return (
+            (u.name && u.name.toLowerCase().includes(s)) ||
+            (u.email && u.email.toLowerCase().includes(s))
+          );
+        })
+      : users;
+
+  console.log("📊 [Render] Filtered users count:", filteredUsers.length);
 
   return (
     <LinearGradient
       colors={["#74b9ff", "#81ecec"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.container}
+      style={{ flex: 1, padding: 15 }}
     >
       {currentUserRole?.toLowerCase() === "admin" && (
-        <Pressable
-          style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.8 }]}
-          onPress={() => navigation.replace("AddUser")}
-        >
-          <Icon name="person-add-outline" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Add Student</Text>
-        </Pressable>
-      )}
+        <>
+          <Pressable
+            style={({ pressed }) => [
+              { ...styles.addBtn },
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={() => {
+              console.log("🟢 [AddUser] Navigating to AddUser screen");
+              navigation.replace("AddUser");
+            }}
+          >
+            <Icon name="person-add-outline" size={20} color="#fff" />
+            <Text style={styles.addBtnText}>Add Student</Text>
+          </Pressable>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Search by name or email"
-        placeholderTextColor="#636e72"
-        value={searchText}
-        onChangeText={setSearchText}
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Search by name or email"
+            placeholderTextColor="#636e72"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </>
+      )}
 
       {users.length === 0 && !loading ? (
         <View
@@ -136,7 +192,9 @@ const Users = ({ navigation, route }) => {
             marginTop: 50,
           }}
         >
-          <Text style={{ fontSize: 16, color: "#2d3436" }}>No users found.</Text>
+          <Text style={{ fontSize: 16, color: "#2d3436" }}>
+            No users found.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -150,25 +208,24 @@ const Users = ({ navigation, route }) => {
           }
           renderItem={({ item, index }) => {
             const id = getId(item);
-            const scale = new Animated.Value(1);
 
-            const onPressIn = () => {
+            const scale = new Animated.Value(1);
+            const onPressIn = () =>
               Animated.spring(scale, {
                 toValue: 0.97,
                 useNativeDriver: true,
               }).start();
-            };
-            const onPressOut = () => {
-              Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
-            };
+            const onPressOut = () =>
+              Animated.spring(scale, {
+                toValue: 1,
+                useNativeDriver: true,
+              }).start();
 
             const slideAnim = animationValues[index] || new Animated.Value(0);
-
             const translateY = slideAnim.interpolate({
               inputRange: [0, 1],
               outputRange: [20, 0],
             });
-
             const opacity = slideAnim.interpolate({
               inputRange: [0, 1],
               outputRange: [0, 1],
@@ -178,44 +235,61 @@ const Users = ({ navigation, route }) => {
               <Animated.View
                 style={[styles.userCard, { transform: [{ translateY }], opacity }]}
               >
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
                   <View>
                     <Text style={styles.userText}>{item.name || "No Name"}</Text>
-                    <Text style={styles.emailText}>{item.email || "No Email"}</Text>
+                    <Text style={styles.emailText}>
+                      {item.email || "No Email"}
+                    </Text>
                     {currentUserRole?.toLowerCase() === "admin" && (
-                      <Text style={styles.roleText}>Role: {item.role || "N/A"}</Text>
+                      <Text style={styles.roleText}>
+                        Role: {item.role || "N/A"}
+                      </Text>
                     )}
                   </View>
-                  <View style={styles.iconRow}>
-                    <Pressable
-                      onPressIn={onPressIn}
-                      onPressOut={onPressOut}
-                      style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-                      onPress={() =>
-                        navigation.replace("EditUser", {
-                          userId: id,
-                          isSelf: currentUserRole?.toLowerCase() !== "admin",
-                        })
-                      }
-                    >
-                      <Icon name="create-outline" size={22} color="#0984e3" />
-                      <Text style={styles.iconLabel}>Edit</Text>
-                    </Pressable>
-
-                    {currentUserRole?.toLowerCase() === "admin" && (
+                  {currentUserRole?.toLowerCase() === "admin" && (
+                    <View style={{ flexDirection: "row", gap: 12 }}>
                       <Pressable
                         onPressIn={onPressIn}
                         onPressOut={onPressOut}
-                        style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-                        onPress={() =>
-                          navigation.replace("DeleteUser", { userId: id })
-                        }
+                        style={({ pressed }) => [
+                          styles.iconBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={() => {
+                          console.log("🟢 [EditUser] Navigating for:", id);
+                          navigation.replace("EditUser", {
+                            userId: id,
+                            isSelf: false,
+                          });
+                        }}
+                      >
+                        <Icon name="create-outline" size={22} color="#0984e3" />
+                        <Text style={styles.iconLabel}>Edit</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPressIn={onPressIn}
+                        onPressOut={onPressOut}
+                        style={({ pressed }) => [
+                          styles.iconBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={() => {
+                          console.log("🗑️ [DeleteUser] Navigating for:", id);
+                          navigation.replace("DeleteUser", { userId: id });
+                        }}
                       >
                         <Icon name="trash-outline" size={22} color="#d63031" />
                         <Text style={styles.iconLabel}>Delete</Text>
                       </Pressable>
-                    )}
-                  </View>
+                    </View>
+                  )}
                 </View>
               </Animated.View>
             );
@@ -227,7 +301,6 @@ const Users = ({ navigation, route }) => {
 };
 
 const styles = {
-  container: { flex: 1, padding: 15 },
   input: {
     backgroundColor: "#fff",
     borderRadius: 25,
@@ -274,7 +347,6 @@ const styles = {
   userText: { fontSize: 17, fontWeight: "bold", color: "#2d3436" },
   emailText: { color: "#636e72", fontSize: 14, marginBottom: 4 },
   roleText: { color: "#636e72", fontSize: 13 },
-  iconRow: { flexDirection: "row", gap: 12 },
   iconBtn: {
     alignItems: "center",
     justifyContent: "center",

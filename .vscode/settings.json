@@ -1,0 +1,15 @@
+{
+    "terminal.integrated.env.windows": {
+      "PATH": "C:\\Users\\abi.kumar\\AppData\\Local\\Android\\Sdk\\platform-tools;${env:PATH}"
+    },
+    "react-native.android.runArguments.device": [
+      "--deviceId",
+      "192.168.1.14:5555"
+    ],
+    "react-native.android.runArguments.emulator": [
+      "--deviceId",
+      "emulator-5554"
+    ],
+    "react-native.packager.port": 8081
+  }
+  
